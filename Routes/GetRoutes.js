@@ -19,6 +19,26 @@ router.get('/posts', async (req, res) => {
     }
 });
 
+// Route to get a single post by ID
+router.get('/posts/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const post = await Post.findById(id).populate('author', 'name'); // Populating the author's name
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Return the full post object
+        res.status(200).json(post);
+    } catch (error) {
+        // Handle a potential CastError if the ID format is invalid
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid Post ID' });
+        }
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+});
 
 // Admin Dashboard route 
 
