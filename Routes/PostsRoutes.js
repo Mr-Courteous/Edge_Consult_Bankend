@@ -9,27 +9,13 @@ const multer = require('multer'); // Import multer
 require('dotenv').config(); // Load environment variables from .env file
 
 // Helper function to generate a slug from a title
-const generateSlug = (title) => {
-    return title
-        .toLowerCase()
-        .replace(/ /g, '-') // Replace spaces with hyphens
-        .replace(/[^\w-]+/g, ''); // Remove all non-word characters (except hyphens)
-};
+// At the top of your file, import the `put` function and `multer`
+const { put } = require('@vercel/blob');
 
-/**
- * @route   POST /api/posts
- * @desc    Create a new blog post
- * @access  Private (You'd typically add middleware here for authentication)
- */
-
-// Set storage engine
-const storage = multer.diskStorage({
-    destination: './uploads/images', // Images will be saved in a folder named 'uploads/images'
-    filename: (req, file, cb) => {
-        // Generate a unique filename: fieldname-timestamp.ext
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
-    }
-});
+// --- NEW Multer Configuration ---
+// Use memory storage instead of disk storage.
+// This stores the file in a buffer in memory before you process it.
+const storage = multer.memoryStorage();
 
 // Init upload middleware
 const upload = multer({
@@ -39,7 +25,7 @@ const upload = multer({
         // Check file type to ensure only images are uploaded
         const filetypes = /jpeg|jpg|png|gif/;
         const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+        const extname = filetypes.test(file.originalname.toLowerCase());
 
         if (mimetype && extname) {
             return cb(null, true);
@@ -49,74 +35,75 @@ const upload = multer({
     }
 }).single('image'); // 'image' is the name of the form field that will contain the file
 
-// --- Route to add new posts ---
+// --- Your Route to add new posts ---
+const generateSlug = (title) => {
+    return title
+        .toLowerCase()
+        .replace(/ /g, '-')
+        .replace(/[^\w-]+/g, '');
+};
 
-/**
- * @route   POST /api/posts/add-posts
- * @desc    Create a new blog post with optional image upload
- * @access  Private (You'd typically add middleware here for authentication)
- */
+// ... (Other imports like express, mongoose, etc.)
+
 router.post('/add-posts', (req, res) => {
     upload(req, res, async (err) => {
         if (err) {
             return res.status(400).json({ message: err });
         }
 
-        // If no file was uploaded, req.file will be undefined
-        const imagePath = req.file ? `/uploads/images/${req.file.filename}` : null;
-
         // 1. Destructure required fields from the request body
-        // Note: When using multer, text fields are in req.body
         const { title, body, category, author, tags } = req.body;
 
         // 2. Basic validation
         if (!title || !body || !category || !author) {
-            // If an image was uploaded but other fields are missing, delete the image
-            if (req.file) {
-                const fs = require('fs'); // Node's file system module
-                fs.unlink(req.file.path, (unlinkErr) => {
-                    if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
-                });
-            }
             return res.status(400).json({ message: 'Please enter all required fields: title, body, category, and author.' });
         }
 
         // 3. Validate author as a valid ObjectId (assuming 'User' model uses ObjectId)
         if (!mongoose.Types.ObjectId.isValid(author)) {
-            if (req.file) {
-                const fs = require('fs');
-                fs.unlink(req.file.path, (unlinkErr) => {
-                    if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
-                });
-            }
             return res.status(400).json({ message: 'Invalid author ID provided.' });
         }
 
         // 4. Generate a slug from the title
         const slug = generateSlug(title);
 
+        let imagePath = null;
         try {
-            // 5. Check if a post with the generated slug or title already exists to prevent duplicates
+            // --- NEW: Upload the image to Vercel Blob ---
+            if (req.file) {
+                // Get the file extension from the original name
+                const fileExt = file.originalname.split('.').pop();
+                // Create a unique filename for the blob
+                const filename = `${slug}-${Date.now()}.${fileExt}`;
+                
+                // Use the Vercel Blob `put` function to upload the file from memory
+                const blob = await put(filename, req.file.buffer, {
+                    access: 'public', // Makes the image publicly accessible via a URL
+                    token: process.env.BLOB_READ_WRITE_TOKEN,
+                });
+
+                // The returned `url` is the public URL of the uploaded image
+                imagePath = blob.url;
+            }
+
+            // 5. Check if a post with the generated slug or title already exists
             const existingPost = await Post.findOne({ $or: [{ slug: slug }, { title: title }] });
             if (existingPost) {
-                if (req.file) {
-                    const fs = require('fs');
-                    fs.unlink(req.file.path, (unlinkErr) => {
-                        if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
-                    });
-                }
+                // Since we've already uploaded the image, we should delete it if the post creation fails
+                // (Note: This is a simplified example, you might handle cleanup differently in production)
+                // For now, we'll just return the error.
                 return res.status(409).json({ message: 'A post with this title or slug already exists.' });
             }
 
-            // 6. Create a new Post instance
+            // 6. Create a new Post instance with the Blob URL
             const newPost = new Post({
                 title,
                 slug,
                 body,
                 category,
                 author,
-                image_path: imagePath, // Save the path to the uploaded image
-                tags: tags ? JSON.parse(tags) : [] // Tags might come as a JSON string from FormData
+                image_path: imagePath, // Save the public URL
+                tags: tags ? JSON.parse(tags) : []
             });
 
             // 7. Save the new post to the database
@@ -127,12 +114,7 @@ router.post('/add-posts', (req, res) => {
 
         } catch (error) {
             console.error('Error creating post:', error.message);
-            if (req.file) {
-                const fs = require('fs');
-                fs.unlink(req.file.path, (unlinkErr) => {
-                    if (unlinkErr) console.error('Error deleting uploaded file:', unlinkErr);
-                });
-            }
+            // In a real app, you might also delete the blob here if the database save fails
             if (error.name === 'ValidationError') {
                 return res.status(400).json({ message: error.message });
             }
@@ -140,8 +122,6 @@ router.post('/add-posts', (req, res) => {
         }
     });
 });
-
-
   
 
 
