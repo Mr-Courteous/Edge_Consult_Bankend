@@ -1,219 +1,233 @@
 const express = require('express');
 const router = express.Router();
-const Post = require('../Models/Posts'); // Import the Post model
-const User = require('../Models/Users'); // Import the User model
-const bcrypt = require('bcryptjs'); // For password hashing
 const mongoose = require('mongoose'); // For ObjectId validation
-const jwt = require('jsonwebtoken'); // Import jsonwebtoken
-const multer = require('multer'); // Import multer
-require('dotenv').config(); // Load environment variables from .env file
+const multer = require('multer'); // Import multer for file uploads
+const jwt = require('jsonwebtoken'); // For handling JWTs (used in login/registration)
+const bcrypt = require('bcryptjs'); // For password hashing (used in login/registration)
+require('dotenv').config(); // Load environment variables
 
-// Helper function to generate a slug from a title
-// At the top of your file, import the `put` function and `multer`
-const { put } = require('@vercel/blob');
+// --- Vercel Blob Storage specific imports ---
+const { put, del } = require('@vercel/blob');
 
-// --- NEW Multer Configuration ---
-// Use memory storage instead of disk storage.
-// This stores the file in a buffer in memory before you process it.
-const storage = multer.memoryStorage();
+// --- Model Imports ---
+const Post = require('../Models/Posts'); // Assuming your blog post model is named 'Post'
+const User = require('../Models/Users'); // Assuming your user model is named 'User'
 
-// Init upload middleware
-const upload = multer({
-    storage: storage,
-    limits: { fileSize: 10000000 }, // Limit file size to 10MB
-    fileFilter: (req, file, cb) => {
-        // Check file type to ensure only images are uploaded
-        const filetypes = /jpeg|jpg|png|gif/;
-        const mimetype = filetypes.test(file.mimetype);
-        const extname = filetypes.test(file.originalname.toLowerCase());
+// --- Middleware & Utility Imports ---
+const verifyToken = require('../Middlewares/verifyToken'); // Middleware to verify JWT and attach user info to req
+const { generateSlug } = require('../Utils/slugGenerator'); // Utility to generate URL-friendly slugs
 
-        if (mimetype && extname) {
-            return cb(null, true);
-        } else {
-            cb('Error: Images Only (JPEG, JPG, PNG, GIF)!');
-        }
-    }
-}).single('image'); // 'image' is the name of the form field that will contain the file
+// --- Multer Configuration ---
+// Use memory storage for Multer to handle file uploads in memory.
+// This is essential for serverless environments like Vercel as the filesystem is read-only.
+const upload = multer({ storage: multer.memoryStorage() });
 
-// --- Your Route to add new posts ---
-const generateSlug = (title) => {
-    return title
-        .toLowerCase()
-        .replace(/ /g, '-')
-        .replace(/[^\w-]+/g, '');
-};
+// ----------------------------------------
+// --- Blog Post Management Routes ---
+// ----------------------------------------
 
-// ... (Other imports like express, mongoose, etc.)
+/**
+ * @route   POST /add-posts
+ * @desc    Create a new blog post with an optional image upload
+ * @access  Private (requires authentication token)
+ */
+router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) => {
+    let blobUrl = null; // Initialize to null for potential cleanup
+    try {
+        // Destructure text fields from req.body, and get author ID from the authenticated user token
+        // const { title, body, category } = req.body;
+        const { title, body, category, author } = req.body;
 
-router.post('/add-posts', (req, res) => {
-    upload(req, res, async (err) => {
-        if (err) {
-            return res.status(400).json({ message: err });
-        }
-
-        // 1. Destructure required fields from the request body
-        const { title, body, category, author, tags } = req.body;
-
-        // 2. Basic validation
+        // Validate essential fields
         if (!title || !body || !category || !author) {
-            return res.status(400).json({ message: 'Please enter all required fields: title, body, category, and author.' });
+            return res.status(400).json({ message: 'Missing required fields: title, body, or category.' });
         }
 
-        // 3. Validate author as a valid ObjectId (assuming 'User' model uses ObjectId)
+        // Validate author ID format
         if (!mongoose.Types.ObjectId.isValid(author)) {
-            return res.status(400).json({ message: 'Invalid author ID provided.' });
+            return res.status(400).json({ message: 'Invalid author ID format.' });
         }
 
-        // 4. Generate a slug from the title
+        // Generate a URL-friendly slug from the post title
         const slug = generateSlug(title);
 
-        let imagePath = null;
-        try {
-            // --- NEW: Upload the image to Vercel Blob ---
-            if (req.file) {
-                // Get the file extension from the original name
-                const fileExt = file.originalname.split('.').pop();
-                // Create a unique filename for the blob
-                const filename = `${slug}-${Date.now()}.${fileExt}`;
-                
-                // Use the Vercel Blob `put` function to upload the file from memory
-                const blob = await put(filename, req.file.buffer, {
-                    access: 'public', // Makes the image publicly accessible via a URL
-                    token: process.env.BLOB_READ_WRITE_TOKEN,
-                });
-
-                // The returned `url` is the public URL of the uploaded image
-                imagePath = blob.url;
-            }
-
-            // 5. Check if a post with the generated slug or title already exists
-            const existingPost = await Post.findOne({ $or: [{ slug: slug }, { title: title }] });
-            if (existingPost) {
-                // Since we've already uploaded the image, we should delete it if the post creation fails
-                // (Note: This is a simplified example, you might handle cleanup differently in production)
-                // For now, we'll just return the error.
-                return res.status(409).json({ message: 'A post with this title or slug already exists.' });
-            }
-
-            // 6. Create a new Post instance with the Blob URL
-            const newPost = new Post({
-                title,
-                slug,
-                body,
-                category,
-                author,
-                image_path: imagePath, // Save the public URL
-                tags: tags ? JSON.parse(tags) : []
-            });
-
-            // 7. Save the new post to the database
-            const savedPost = await newPost.save();
-
-            // 8. Respond with the newly created post
-            res.status(201).json(savedPost);
-
-        } catch (error) {
-            console.error('Error creating post:', error.message);
-            // In a real app, you might also delete the blob here if the database save fails
-            if (error.name === 'ValidationError') {
-                return res.status(400).json({ message: error.message });
-            }
-            res.status(500).json({ message: 'Server error when creating post.' });
+        // Check if a post with the generated slug or title already exists to prevent duplicates
+        const existingPost = await Post.findOne({ $or: [{ slug: slug }, { title: title }] });
+        if (existingPost) {
+            return res.status(409).json({ message: 'A post with this title or slug already exists. Please use a different title.' });
         }
-    });
+
+        // Handle image upload to Vercel Blob Storage if a file is present
+        if (req.file) {
+            // Ensure filename is unique and has the correct extension
+            const fileExt = req.file.originalname.split('.').pop();
+            const filename = `${slug}-${Date.now()}.${fileExt}`;
+            
+            // Upload the file buffer to Vercel Blob
+            const blob = await put(filename, req.file.buffer, {
+                access: 'public', // Makes the image accessible via a public URL
+                token: process.env.BLOB_READ_WRITE_TOKEN, // Your Vercel Blob API token
+            });
+            blobUrl = blob.url; // Store the URL for the new post and potential cleanup
+        }
+
+        // Parse tags from the request body (assuming it's a JSON string)
+        const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
+
+        // Create a new Post instance with all validated and processed data
+        const newPost = new Post({
+            title,
+            slug,
+            body,
+            category,
+            author,
+            image_path: blobUrl, // Store the public URL of the uploaded image
+            tags: tags
+        });
+
+        // Save the new post to the database
+        const savedPost = await newPost.save();
+
+        // Respond with success and the newly created post data
+        res.status(201).json({ message: 'Blog post created successfully!', post: savedPost });
+
+    } catch (error) {
+        // Log the full error for debugging purposes
+        console.error('Error creating blog post:', error);
+
+        // --- Cleanup: Delete the uploaded blob if the database save or any other step fails ---
+        if (blobUrl) {
+            try {
+                await del(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
+                console.log(`Successfully deleted orphaned blob: ${blobUrl}`);
+            } catch (blobError) {
+                console.error(`Failed to delete orphaned blob: ${blobUrl}`, blobError);
+            }
+        }
+
+        // Handle Mongoose validation errors
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({ message: `Validation failed: ${messages.join(', ')}` });
+        }
+        
+        // Catch-all for other server errors
+        res.status(500).json({ message: 'Server error occurred while creating the post. Please try again later.' });
+    }
 });
-  
 
 
-
-// Registration Routes
-
+/**
+ * @route   POST /register
+ * @desc    Register a new user (admin role by default for first user)
+ * @access  Public
+ */
 router.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
 
-    // 1. Basic Validation
+    // Basic Validation
     if (!name || !email || !password) {
-        return res.status(400).json({ message: 'Please enter all fields: name, email, and password.' });
+        return res.status(400).json({ message: 'Please provide all required fields: name, email, and password.' });
     }
 
-    // 2. Check if a user with this email already exists
     try {
+        // Check if a user with this email already exists
         let user = await User.findOne({ email });
         if (user) {
             return res.status(409).json({ message: 'A user with this email already exists.' });
         }
 
-        // 3. Hash the password
+        // Hash the password for security
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // 4. Create a new User instance
+        // Create a new User instance; assign 'admin' role by default
         user = new User({
             name,
             email,
             password: hashedPassword,
-            role: 'admin' // The first user is an admin by default
+            role: 'admin' // Default role
         });
 
-        // 5. Save the user to the database
+        // Save the new user to the database
         await user.save();
 
-        // 6. Respond with success (excluding the password)
-        res.status(201).json({ message: 'User registered successfully!', user: { name: user.name, email: user.email, role: user.role } });
+        // Respond with success message and basic user info (exclude password)
+        res.status(201).json({ 
+            message: 'User registered successfully!', 
+            user: { id: user._id, name: user.name, email: user.email, role: user.role } 
+        });
 
     } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ message: 'Server error during registration.' });
+        console.error('Error during user registration:', error.message);
+        // Handle Mongoose validation errors for registration
+        if (error.name === 'ValidationError') {
+            const messages = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({ message: `Registration failed: ${messages.join(', ')}` });
+        }
+        res.status(500).json({ message: 'Server error occurred during registration. Please try again later.' });
     }
 });
 
-
-
-
-// Login Route
-
-
-
+/**
+ * @route   POST /login
+ * @desc    Authenticate user and get JWT
+ * @access  Public
+ */
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
-    // 1. Basic Validation
+    // Basic Validation
     if (!email || !password) {
-        return res.status(400).json({ message: 'Please enter both email and password.' });
+        return res.status(400).json({ message: 'Please provide both email and password.' });
     }
 
     try {
-        // 2. Check if the user exists
+        // Check if the user exists in the database
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ message: 'Invalid credentials.' });
+            return res.status(400).json({ message: 'Invalid email or password.' });
         }
 
-        // 3. Compare the provided password with the stored hashed password
+        // Compare the provided password with the stored hashed password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            return res.status(400).json({ message: 'Invalid credentials.' });
+            return res.status(400).json({ message: 'Invalid email or password.' });
         }
 
-        // 4. Create the JWT payload
+        // Prepare the payload for the JWT
         const payload = {
             user: {
-                id: user.id, // The user's database ID
-                role: user.role // The user's role (admin, user, etc.)
+                id: user.id, // User's unique database ID
+                role: user.role, // User's role
+                name: user.name // User's name for convenience
             }
         };
 
-        // 5. Sign the token and send it back
+        // --- Refinement: Explicitly retrieve secret for clarity and parser safety ---
+        const jwtSecret = process.env.JWT_SECRET;
+        if (!jwtSecret) {
+            // This error will be caught at runtime if JWT_SECRET is truly missing.
+            // A SyntaxError is a parsing error, which is different.
+            console.error("Server configuration error: JWT_SECRET environment variable is not set.");
+            return res.status(500).json({ message: 'Server configuration error: Authentication secret is missing.' });
+        }
+
+        // Sign the token and send it back to the client
         jwt.sign(
             payload,
-            process.env.JWT_SECRET, // Use the secret key from your .env file
-            { expiresIn: '1h' }, // Token expires in 1 hour
+            jwtSecret, // Use the explicitly defined variable
+            { expiresIn: '1h' }, // Token expires in 1 hour (adjust as needed)
             (err, token) => {
-                if (err) throw err;
+                if (err) {
+                    console.error("Error signing JWT:", err);
+                    return res.status(500).json({ message: 'Error generating authentication token.' });
+                }
                 res.status(200).json({
                     message: 'Login successful!',
-                    token, // The JWT is sent to the client
+                    token, // The JSON Web Token
                     user: {
+                        id: user._id, // Send the user ID
                         name: user.name,
                         email: user.email,
                         role: user.role
@@ -223,10 +237,11 @@ router.post('/login', async (req, res) => {
         );
 
     } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ message: 'Server error during login.' });
+        console.error('Error during user login:', error.message);
+        res.status(500).json({ message: 'Server error occurred during login. Please try again later.' });
     }
 });
 
 
 module.exports = router;
+        

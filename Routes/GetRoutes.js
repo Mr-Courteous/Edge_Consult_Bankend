@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const Post = require('../Models/Posts'); // Ensure this path is correct
 const User = require('../Models/Users'); // Import the User model
+const verifyToken = require('../Middlewares/verifyToken'); // Middleware to verify JWT and attach user info to request
+
 
 
 /**
@@ -37,12 +39,12 @@ router.get('/posts/:id', async (req, res) => {
             return res.status(400).json({ message: 'Invalid Post ID' });
         }
         res.status(500).json({ message: 'Server error', error: error.message });
-    }
+    }       
 });
 
 // Admin Dashboard route 
 
-router.get('/admin-dashboard', async (req, res) => {
+router.get('/admin-dashboard',verifyToken, async (req, res) => {
     try {
         // Fetch all data concurrently using Promise.all for efficiency
         const [
