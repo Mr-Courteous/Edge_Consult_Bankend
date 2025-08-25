@@ -7,7 +7,7 @@ const app = express();
 const connectDB = require('./Dbconnection');
 
 // Middleware for CORS and body parsing
-const cors = require('cors'); // Import the cors package
+const cors = require('cors'); 
 const bodyParser = require('body-parser'); 
 
 // Import your route files
@@ -18,11 +18,11 @@ const GetRoutes = require('./Routes/GetRoutes');
 
 // Enable CORS for all origins and all routes.
 // This is the simplest way to allow any frontend to communicate with your API.
-// IMPORTANT: For production, you might want to restrict this to specific domains for security.
-// Place this BEFORE any routes are defined or used.
+// Note: for production, you might want to restrict this to specific domains for security.
 app.use(cors()); 
 
 // Middleware to parse incoming JSON data from the request body.
+// express.json() is now a built-in alternative to bodyParser.json().
 app.use(express.json());
 
 // If you need to handle URL-encoded form data
@@ -37,8 +37,8 @@ connectDB();
 
 // Use a base path for your API routes to keep them organized.
 // For example, all post-related routes will start with '/api/posts'.
-app.use('/api', PostRoutes); // Example: Prefixing routes with /api
-app.use('/api', GetRoutes);  // Example: Prefixing routes with /api
+app.use(PostRoutes);
+app.use(GetRoutes);
 
 
 // --- Generic Routes ---
