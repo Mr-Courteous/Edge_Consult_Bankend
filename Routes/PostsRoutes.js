@@ -4,6 +4,7 @@ const mongoose = require('mongoose'); // For ObjectId validation
 const multer = require('multer'); // Import multer for file uploads
 const jwt = require('jsonwebtoken'); // For handling JWTs (used in login/registration)
 const bcrypt = require('bcryptjs'); // For password hashing (used in login/registration)
+const Comment = require('../Models/Comments'); // Import the Comment model
 require('dotenv').config(); // Load environment variables
 
 // --- Vercel Blob Storage specific imports ---
@@ -65,7 +66,7 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
         if (req.file) {
             const fileExt = req.file.originalname.split('.').pop();
             const filename = `${slug}-${Date.now()}.${fileExt}`;
-            
+
             const blob = await put(filename, req.file.buffer, {
                 access: 'public',
                 token: process.env.BLOB_READ_WRITE_TOKEN,
@@ -91,7 +92,7 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
         if (category === 'scholarships') {
             // Parse requirements if they are sent as a JSON string
             const parsedRequirements = requirements ? JSON.parse(requirements) : [];
-            
+
             // Add the scholarshipDetails object to the postData
             postData.scholarshipDetails = {
                 country,
@@ -129,7 +130,7 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
             const messages = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({ message: `Validation failed: ${messages.join(', ')}` });
         }
-        
+
         // Catch-all for other server errors
         res.status(500).json({ message: 'Server error occurred while creating the post. Please try again later.' });
     }
@@ -139,6 +140,70 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
  * @desc    Register a new user (admin role by default for first user)
  * @access  Public
  */
+
+
+// @route   POST api/comments/:postId
+// @desc    Add a comment to a post
+// @access  Private (requires authentication)
+
+router.post('/:postId', async (req, res) => {
+    // Expecting either `authorId` or `author_info` (with fullName and email)
+    const { content, authorId, author_info } = req.body;
+    const postId = req.params.postId;
+
+    // Basic validation for the comment content
+    if (!content) {
+        return res.status(400).json({ msg: 'Comment content is required' });
+    }
+
+    // Check for at least one of the two optional fields
+    // A comment must be associated with an author OR provide author info
+    if (!authorId && (!author_info || (!author_info.fullName && !author_info.email))) {
+        return res.status(400).json({ msg: 'Either authorId or author_info (with a name/email) is required' });
+    }
+
+    try {
+        // Find the post to ensure it exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ msg: 'Post not found' });
+        }
+
+        const newCommentData = {
+            content,
+            post: postId
+        };
+
+        // Conditionally add the author fields based on what was provided
+        if (authorId) {
+            newCommentData.author = authorId;
+        } else if (author_info) {
+            newCommentData.author_info = author_info;
+        }
+
+        // Create a new comment instance
+        const newComment = new Comment(newCommentData);
+
+        // Save the comment to the database
+        const savedComment = await newComment.save();
+
+        // Update the comment count on the post
+        post.commentCount++;
+        await post.save();
+
+        // Populate the author data before sending the response
+        // This makes the response more useful to the frontend
+        const populatedComment = await Comment.findById(savedComment._id)
+                                          .populate('author', 'fullName email') // Populate the User model fields
+                                          .lean(); // Convert to a plain JavaScript object
+
+        res.status(201).json(populatedComment);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
+
 router.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
 
@@ -170,9 +235,9 @@ router.post('/register', async (req, res) => {
         await user.save();
 
         // Respond with success message and basic user info (exclude password)
-        res.status(201).json({ 
-            message: 'User registered successfully!', 
-            user: { id: user._id, name: user.name, email: user.email, role: user.role } 
+        res.status(201).json({
+            message: 'User registered successfully!',
+            user: { id: user._id, name: user.name, email: user.email, role: user.role }
         });
 
     } catch (error) {
@@ -261,4 +326,3 @@ router.post('/login', async (req, res) => {
 
 
 module.exports = router;
-        

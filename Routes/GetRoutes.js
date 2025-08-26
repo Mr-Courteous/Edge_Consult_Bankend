@@ -3,6 +3,7 @@ const router = express.Router();
 const Post = require('../Models/Posts'); // Ensure this path is correct
 const User = require('../Models/Users'); // Import the User model
 const verifyToken = require('../Middlewares/verifyToken'); // Middleware to verify JWT and attach user info to request
+const Comment = require('../Models/Comments'); // Import the Comment model
 
 
 
@@ -41,6 +42,20 @@ router.get('/posts/:id', async (req, res) => {
         res.status(500).json({ message: 'Server error', error: error.message });
     }       
 });
+// get all cooments numbers
+
+router.get('/posts', async (req, res) => {
+    try {
+        const posts = await Post.find()
+                                .sort({ createdAt: -1 }) // Sort by newest first
+                                .populate('author', 'fullName'); // Populate the author's name
+                                
+        res.json(posts);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
 
 // scholarships route to get posts with category 'scholarships'
 
@@ -56,6 +71,26 @@ router.get('/scholarships', async (req, res) => {
 
 
 
+router.get('/post/:postId', async (req, res) => {
+    try {
+        const postId = req.params.postId;
+
+        // Find all comments for the given postId
+        // Populate the 'author' field to get user details if available
+        const comments = await Comment.find({ post: postId })
+                                      .populate('author', 'fullName email') // Only populate if 'author' (ObjectId) exists
+                                      .sort({ createdAt: -1 }) // Sort by newest comments first
+                                      .lean(); // For performance, get plain JavaScript objects
+
+        // The populate will only work if the 'author' field is actually an ObjectId referencing a User.
+        // If it's an anonymous comment, the 'author' field will be null, and 'author_info' will contain the details.
+        
+        res.status(200).json(comments);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
+    }
+});
 // Admin Dashboard route 
 
 router.get('/admin-dashboard',verifyToken, async (req, res) => {
