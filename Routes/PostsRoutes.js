@@ -29,14 +29,18 @@ const upload = multer({ storage: multer.memoryStorage() });
 /**
  * @route   POST /add-posts
  * @desc    Create a new blog post with an optional image upload
- * @access  Private (requires authentication token)
+ * @access  Private (requires authentication token)/*
+ * Route to create a new blog post.
+ * It supports general posts and specific scholarship-type posts with additional fields.
  */
 router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) => {
     let blobUrl = null; // Initialize to null for potential cleanup
     try {
-        // Destructure text fields from req.body, and get author ID from the authenticated user token
-        // const { title, body, category } = req.body;
+        // Destructure core fields from req.body
         const { title, body, category, author } = req.body;
+
+        // Destructure scholarship-specific fields, if present
+        const { country, degree, description, funding, deadline, requirements } = req.body;
 
         // Validate essential fields
         if (!title || !body || !category || !author) {
@@ -51,7 +55,7 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
         // Generate a URL-friendly slug from the post title
         const slug = generateSlug(title);
 
-        // Check if a post with the generated slug or title already exists to prevent duplicates
+        // Check for duplicate title or slug
         const existingPost = await Post.findOne({ $or: [{ slug: slug }, { title: title }] });
         if (existingPost) {
             return res.status(409).json({ message: 'A post with this title or slug already exists. Please use a different title.' });
@@ -59,33 +63,48 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
 
         // Handle image upload to Vercel Blob Storage if a file is present
         if (req.file) {
-            // Ensure filename is unique and has the correct extension
             const fileExt = req.file.originalname.split('.').pop();
             const filename = `${slug}-${Date.now()}.${fileExt}`;
             
-            // Upload the file buffer to Vercel Blob
             const blob = await put(filename, req.file.buffer, {
-                access: 'public', // Makes the image accessible via a public URL
-                token: process.env.BLOB_READ_WRITE_TOKEN, // Your Vercel Blob API token
+                access: 'public',
+                token: process.env.BLOB_READ_WRITE_TOKEN,
             });
-            blobUrl = blob.url; // Store the URL for the new post and potential cleanup
+            blobUrl = blob.url;
         }
 
-        // Parse tags from the request body (assuming it's a JSON string)
+        // Parse tags from the request body
         const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
 
-        // Create a new Post instance with all validated and processed data
-        const newPost = new Post({
+        // Prepare the post object to be saved
+        const postData = {
             title,
             slug,
             body,
             category,
             author,
-            image_path: blobUrl, // Store the public URL of the uploaded image
+            image_path: blobUrl,
             tags: tags
-        });
+        };
 
-        // Save the new post to the database
+        // If the category is 'scholarships', add the specific details
+        if (category === 'scholarships') {
+            // Parse requirements if they are sent as a JSON string
+            const parsedRequirements = requirements ? JSON.parse(requirements) : [];
+            
+            // Add the scholarshipDetails object to the postData
+            postData.scholarshipDetails = {
+                country,
+                degree,
+                description,
+                funding,
+                deadline,
+                requirements: parsedRequirements
+            };
+        }
+
+        // Create and save the new post instance
+        const newPost = new Post(postData);
         const savedPost = await newPost.save();
 
         // Respond with success and the newly created post data
@@ -115,8 +134,6 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
         res.status(500).json({ message: 'Server error occurred while creating the post. Please try again later.' });
     }
 });
-
-
 /**
  * @route   POST /register
  * @desc    Register a new user (admin role by default for first user)

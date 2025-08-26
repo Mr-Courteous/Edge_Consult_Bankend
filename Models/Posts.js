@@ -29,10 +29,9 @@ const PostSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
-    // Changed from image_url to image_path to store the server path of the uploaded image
     image_path: {
         type: String,
-        required: false // Not all posts might have an image
+        required: false
     },
     tags: {
         type: [String],
@@ -52,6 +51,38 @@ const PostSchema = new mongoose.Schema({
     commentCount: {
         type: Number,
         default: 0
+    },
+    // New optional fields for scholarships
+    scholarshipDetails: {
+        // You can use an object to group all scholarship-related fields
+        required: false, // Make the entire object optional
+        type: {
+            // New fields specific to a scholarship post
+            country: {
+                type: String,
+                required: false
+            },
+            degree: {
+                type: String,
+                required: false
+            },
+            description: {
+                type: String,
+                required: false
+            },
+            funding: {
+                type: String,
+                required: false
+            },
+            deadline: {
+                type: String,
+                required: false
+            },
+            requirements: {
+                type: [String],
+                required: false
+            }
+        }
     }
 }, {
     timestamps: true
