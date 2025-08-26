@@ -71,6 +71,7 @@ router.get('/scholarships', async (req, res) => {
 
 
 
+
 router.get('/post/:postId', async (req, res) => {
     try {
         const postId = req.params.postId;
@@ -91,6 +92,9 @@ router.get('/post/:postId', async (req, res) => {
         res.status(500).send('Server error');
     }
 });
+
+
+
 // Admin Dashboard route 
 
 router.get('/admin-dashboard',verifyToken, async (req, res) => {
@@ -134,6 +138,13 @@ router.get('/admin-dashboard',verifyToken, async (req, res) => {
 
 
 
+
+
+
+
+
+
+
 // Admin Metrics route
 
 router.get('/metrics', async (req, res) => {
@@ -170,6 +181,42 @@ router.get('/metrics', async (req, res) => {
         res.status(500).json({ message: 'Server error when fetching metrics.' });
     }
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 module.exports = router;
