@@ -88,51 +88,92 @@ router.get('/posts/:postId/comments', async (req, res) => {
 
 
 
-// single Posts with metadata 
+// // single Posts with metadata 
 
-router.get('/posts/:id', async (req, res) => {
+// router.get('/:id', async (req, res) => {
+//     try {
+//         const postId = req.params.id;
+//         const post = await Post.findById(postId).populate('author', 'name email');
+
+//         if (!post) return res.status(404).send('Post not found');
+
+//         const meta = {
+//             title: post.title,
+//             description: post.body.substring(0, 160),
+//             image: post.image_path || '/default.jpg',
+//             likes: post.likeCount,
+//             author: post.author.name,
+//             url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
+//         };
+
+//         // If request expects JSON (SPA)
+//         if (req.headers.accept && req.headers.accept.includes('application/json')) {
+//             return res.json({ post, meta });
+//         }
+
+//         // Otherwise render SSR page
+//         res.render('post', { meta });
+
+//     } catch (error) {
+//         console.error(error);
+//         res.status(500).send('Server error');
+//     }
+// });
+
+
+
+
+
+
+
+
+// SPA API route: used by React fetch
+router.get('/api/posts/:id', async (req, res) => {
     try {
-        const postId = req.params.id;
-        const post = await Post.findById(postId).populate('author', 'name email');
+        const post = await Post.findById(req.params.id).populate('author', 'name email');
+        if (!post) return res.status(404).json({ message: 'Post not found' });
 
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-
-        // Generate meta tags
         const meta = {
             title: post.title,
-            description: post.body.substring(0, 160), // first 160 chars for description
+            description: post.body.substring(0, 160),
             image: post.image_path || '/default.jpg',
             likes: post.likeCount,
-            author: post.author.name,
+            author: post.author?.name || 'Anonymous',
             url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
         };
 
         res.json({ post, meta });
     } catch (error) {
-        console.error(error);
+        console.error('API fetch error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
 
+// SSR route: renders HTML with meta for crawlers and initial React hydration
+router.get('/posts/:id', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id).populate('author', 'name email');
+        if (!post) return res.status(404).send('Post not found');
 
+        const meta = {
+            title: post.title,
+            description: post.body.substring(0, 160),
+            image: post.image_path || '/default.jpg',
+            likes: post.likeCount,
+            author: post.author?.name || 'Anonymous',
+            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
+        };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        // Render the EJS template with meta and initialPost for React hydration
+        res.render('post', {
+            meta,
+            initialPost: post
+        });
+    } catch (error) {
+        console.error('SSR render error:', error);
+        res.status(500).send('Server error');
+    }
+});
 
 
 

@@ -1,65 +1,77 @@
-// Load environment variables from a .env file
+// Load environment variables
 require('dotenv').config();
-
-
 
 // Core Express and database connection
 const express = require('express');
-const app = express();
+const path = require('path');
+const cors = require('cors');
 const connectDB = require('./Dbconnection');
 
-// Middleware for CORS and body parsing
-const cors = require('cors'); 
-const bodyParser = require('body-parser'); 
+// Import your routes
+const PostRoutes = require('./Routes/PostsRoutes'); // API routes
+const GetRoutes = require('./Routes/GetRoutes');     // Other API routes
 
-// Import your route files
-const PostRoutes = require('./Routes/PostsRoutes');
-const GetRoutes = require('./Routes/GetRoutes');
+// Initialize Express app
+const app = express();
 
 // --- Global Middleware ---
-
-// Enable CORS for all origins and all routes.
-// This is the simplest way to allow any frontend to communicate with your API.
-// Note: for production, you might want to restrict this to specific domains for security.
-app.use(cors()); 
-
-// Middleware to parse incoming JSON data from the request body.
-// express.json() is now a built-in alternative to bodyParser.json().
-app.use(express.json());
-
-// If you need to handle URL-encoded form data
-app.use(express.urlencoded({ extended: true }));
+app.use(cors()); // Allow requests from all origins
+app.use(express.json()); // Parse JSON request bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // --- Database Connection ---
-
-// Call the function to connect to your database.
 connectDB();
 
+// --- View Engine for SSR ---
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views')); // Place your EJS templates here
+
+// --- Serve Static Files from Vite Build ---
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
 // --- API Routes ---
+app.use( PostRoutes); // Prefix API routes with /api/posts
+app.use( GetRoutes);        // Other API routes
 
-// Use a base path for your API routes to keep them organized.
-// For example, all post-related routes will start with '/api/posts'.
-app.use(PostRoutes);
-app.use(GetRoutes);
+// --- SSR Route for Individual Posts ---
+// This assumes you have a posts EJS template at /server/views/post.ejs
+app.get('/posts/:id', async (req, res) => {
+    try {
+        const Post = require('./Models/Posts'); // Your Mongoose model
+        const postId = req.params.id;
+        const post = await Post.findById(postId).populate('author', 'name email');
 
+        if (!post) return res.status(404).send('Post not found');
 
-// --- Generic Routes ---
+        const meta = {
+            title: post.title,
+            description: post.body.substring(0, 160),
+            image: post.image_path || '/default.jpg',
+            likes: post.likeCount,
+            author: post.author.name,
+            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`,
+        };
 
-// Define the root route.
+        res.render('post', { meta });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Server error');
+    }
+});
+
+// --- Root Route ---
 app.get('/', (req, res) => {
-  res.send('Hello from your simple Express server!');
+    res.send('Hello from your Express server!');
 });
 
-// A simple example of a GET route with a query parameter.
+// --- Example Query Route ---
 app.get('/api/greet', (req, res) => {
-  const name = req.query.name || 'Guest';
-  res.status(200).json({ message: `Greetings, ${name}!` });
+    const name = req.query.name || 'Guest';
+    res.status(200).json({ message: `Greetings, ${name}!` });
 });
 
-// --- Server Startup ---
-
+// --- Start Server ---
 const port = process.env.PORT || 3000;
-
 app.listen(port, () => {
-  console.log(`Server is running at http://localhost:${port}`);
+    console.log(`Server is running at http://localhost:${port}`);
 });

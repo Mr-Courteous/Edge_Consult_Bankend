@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title><%= meta.title %></title>
+  <meta name="description" content="<%= meta.description %>">
+  <meta property="og:title" content="<%= meta.title %>">
+  <meta property="og:description" content="<%= meta.description %>">
+  <meta property="og:image" content="<%= meta.image %>">
+  <meta property="og:url" content="<%= meta.url %>">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Your main CSS -->
+  <link rel="stylesheet" href="/dist/style.css">
+</head>
+<body>
+  <!-- Root div for React hydration -->
+  <div id="root" data-initial-post='<%- JSON.stringify(post) %>'></div>
+
+  <!-- Your JS bundle -->
+  <script type="module" src="/dist/main.js"></script>
+</body>
+</html>
