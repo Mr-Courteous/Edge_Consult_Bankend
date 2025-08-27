@@ -12,50 +12,80 @@ const Comment = require('../Models/Comments'); // Import the Comment model
  * @desc    Get all posts
  * @access  Public
  */
-router.get('/posts', async (req, res) => {
-    try {
-        const posts = await Post.find().sort({ createdAt: -1 }); // Sort by creation date (newest first)
-        res.status(200).json(posts);
-    } catch (error) {
-        console.error('Error fetching posts:', error.message);
-        res.status(500).json({ message: 'Server error when fetching posts.' });
-    }
-});
+// router.get('/posts', async (req, res) => {
+//     try {
+//         const posts = await Post.find().sort({ createdAt: -1 }); // Sort by creation date (newest first)
+//         res.status(200).json(posts);
+//     } catch (error) {
+//         console.error('Error fetching posts:', error.message);
+//         res.status(500).json({ message: 'Server error when fetching posts.' });
+//     }
+// });
 
-// Route to get a single post by ID
-router.get('/posts/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const post = await Post.findById(id).populate('author', 'name'); // Populating the author's name
-
-        if (!post) {
-            return res.status(404).json({ message: 'Post not found' });
-        }
-
-        // Return the full post object
-        res.status(200).json(post);
-    } catch (error) {
-        // Handle a potential CastError if the ID format is invalid
-        if (error.name === 'CastError') {
-            return res.status(400).json({ message: 'Invalid Post ID' });
-        }
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }       
-});
-// get all cooments numbers
 
 router.get('/posts', async (req, res) => {
     try {
         const posts = await Post.find()
-                                .sort({ createdAt: -1 }) // Sort by newest first
-                                .populate('author', 'fullName'); // Populate the author's name
-                                
+            .sort({ createdAt: -1 }) // Sort by newest first
+            .populate('author', 'fullName'); // Populate the author's name
+
         res.json(posts);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
     }
 });
+
+
+
+// Route to get a single post by ID
+router.get('/posts/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const post = await Post.findById(id).populate('author', 'name');
+    if (!post) return res.status(404).send('<h1>Post not found</h1>');
+
+    const pageTitle = post.title;
+    const pageDescription = post.body?.substring(0, 150) || '';
+    const pageImage = post.image_path || '';
+    const pageUrl = `https://your-domain.com/posts/${post._id}`;
+
+    res.send(`
+      <!DOCTYPE html>
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8"/>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+          <title>${pageTitle}</title>
+          <meta name="description" content="${pageDescription}"/>
+          <meta property="og:title" content="${pageTitle}"/>
+          <meta property="og:description" content="${pageDescription}"/>
+          <meta property="og:image" content="${pageImage}"/>
+          <meta property="og:url" content="${pageUrl}"/>
+          <meta name="twitter:card" content="summary_large_image"/>
+          <meta name="twitter:title" content="${pageTitle}"/>
+          <meta name="twitter:description" content="${pageDescription}"/>
+          <meta name="twitter:image" content="${pageImage}"/>
+        </head>
+        <body>
+          <div id="root"></div>
+          <script>
+            window.__POST_DATA__ = ${JSON.stringify(post)};
+          </script>
+          <script src="/bundle.js"></script>
+        </body>
+      </html>
+    `);
+  } catch (error) {
+    if (error.name === 'CastError') return res.status(400).send('<h1>Invalid Post ID</h1>');
+    console.error(error);
+    res.status(500).send('<h1>Server error</h1>');
+  }
+});
+
+// get all cooments numbers
+
+
 
 // scholarships route to get posts with category 'scholarships'
 
@@ -72,32 +102,32 @@ router.get('/scholarships', async (req, res) => {
 
 
 
-router.get('/post/:postId', async (req, res) => {
-    try {
-        const postId = req.params.postId;
+// router.get('/post/:postId', async (req, res) => {
+//     try {
+//         const postId = req.params.postId;
 
-        // Find all comments for the given postId
-        // Populate the 'author' field to get user details if available
-        const comments = await Comment.find({ post: postId })
-                                      .populate('author', 'fullName email') // Only populate if 'author' (ObjectId) exists
-                                      .sort({ createdAt: -1 }) // Sort by newest comments first
-                                      .lean(); // For performance, get plain JavaScript objects
+//         // Find all comments for the given postId
+//         // Populate the 'author' field to get user details if available
+//         const comments = await Comment.find({ post: postId })
+//             .populate('author', 'fullName email') // Only populate if 'author' (ObjectId) exists
+//             .sort({ createdAt: -1 }) // Sort by newest comments first
+//             .lean(); // For performance, get plain JavaScript objects
 
-        // The populate will only work if the 'author' field is actually an ObjectId referencing a User.
-        // If it's an anonymous comment, the 'author' field will be null, and 'author_info' will contain the details.
-        
-        res.status(200).json(comments);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
-    }
-});
+//         // The populate will only work if the 'author' field is actually an ObjectId referencing a User.
+//         // If it's an anonymous comment, the 'author' field will be null, and 'author_info' will contain the details.
+
+//         res.status(200).json(comments);
+//     } catch (err) {
+//         console.error(err.message);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 
 
 // Admin Dashboard route 
 
-router.get('/admin-dashboard',verifyToken, async (req, res) => {
+router.get('/admin-dashboard', verifyToken, async (req, res) => {
     try {
         // Fetch all data concurrently using Promise.all for efficiency
         const [

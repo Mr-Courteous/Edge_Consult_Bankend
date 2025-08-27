@@ -1,6 +1,8 @@
 // Load environment variables from a .env file
 require('dotenv').config();
 
+
+
 // Core Express and database connection
 const express = require('express');
 const app = express();
