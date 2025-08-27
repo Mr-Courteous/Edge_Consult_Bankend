@@ -21,7 +21,7 @@ const PostSchema = new mongoose.Schema({
     category: {
         type: String,
         required: true,
-        enum: ['news', 'nysc', 'scholarships'],
+        enum: ['news', 'nysc', 'scholarships', 'jobs'],
         trim: true
     },
     author: {

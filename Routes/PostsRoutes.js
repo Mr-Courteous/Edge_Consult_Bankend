@@ -141,69 +141,6 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
  * @access  Public
  */
 
-
-// @route   POST api/comments/:postId
-// @desc    Add a comment to a post
-// @access  Private (requires authentication)
-
-router.post('/:postId', async (req, res) => {
-    // Expecting either `authorId` or `author_info` (with fullName and email)
-    const { content, authorId, author_info } = req.body;
-    const postId = req.params.postId;
-
-    // Basic validation for the comment content
-    if (!content) {
-        return res.status(400).json({ msg: 'Comment content is required' });
-    }
-
-    // Check for at least one of the two optional fields
-    // A comment must be associated with an author OR provide author info
-    if (!authorId && (!author_info || (!author_info.fullName && !author_info.email))) {
-        return res.status(400).json({ msg: 'Either authorId or author_info (with a name/email) is required' });
-    }
-
-    try {
-        // Find the post to ensure it exists
-        const post = await Post.findById(postId);
-        if (!post) {
-            return res.status(404).json({ msg: 'Post not found' });
-        }
-
-        const newCommentData = {
-            content,
-            post: postId
-        };
-
-        // Conditionally add the author fields based on what was provided
-        if (authorId) {
-            newCommentData.author = authorId;
-        } else if (author_info) {
-            newCommentData.author_info = author_info;
-        }
-
-        // Create a new comment instance
-        const newComment = new Comment(newCommentData);
-
-        // Save the comment to the database
-        const savedComment = await newComment.save();
-
-        // Update the comment count on the post
-        post.commentCount++;
-        await post.save();
-
-        // Populate the author data before sending the response
-        // This makes the response more useful to the frontend
-        const populatedComment = await Comment.findById(savedComment._id)
-                                          .populate('author', 'fullName email') // Populate the User model fields
-                                          .lean(); // Convert to a plain JavaScript object
-
-        res.status(201).json(populatedComment);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send('Server error');
-    }
-});
-
 router.post('/register', async (req, res) => {
     const { name, email, password } = req.body;
 
@@ -321,6 +258,73 @@ router.post('/login', async (req, res) => {
     } catch (error) {
         console.error('Error during user login:', error.message);
         res.status(500).json({ message: 'Server error occurred during login. Please try again later.' });
+    }
+});
+
+
+
+
+
+
+// @route   POST api/comments/:postId
+// @desc    Add a comment to a post
+// @access  Private (requires authentication)
+
+router.post('/:postId', async (req, res) => {
+    // Expecting either `authorId` or `author_info` (with fullName and email)
+    const { content, authorId, author_info } = req.body;
+    const postId = req.params.postId;
+
+    // Basic validation for the comment content
+    if (!content) {
+        return res.status(400).json({ msg: 'Comment content is required' });
+    }
+
+    // Check for at least one of the two optional fields
+    // A comment must be associated with an author OR provide author info
+    if (!authorId && (!author_info || (!author_info.fullName && !author_info.email))) {
+        return res.status(400).json({ msg: 'Either authorId or author_info (with a name/email) is required' });
+    }
+
+    try {
+        // Find the post to ensure it exists
+        const post = await Post.findById(postId);
+        if (!post) {
+            return res.status(404).json({ msg: 'Post not found' });
+        }
+
+        const newCommentData = {
+            content,
+            post: postId
+        };
+
+        // Conditionally add the author fields based on what was provided
+        if (authorId) {
+            newCommentData.author = authorId;
+        } else if (author_info) {
+            newCommentData.author_info = author_info;
+        }
+
+        // Create a new comment instance
+        const newComment = new Comment(newCommentData);
+
+        // Save the comment to the database
+        const savedComment = await newComment.save();
+
+        // Update the comment count on the post
+        post.commentCount++;
+        await post.save();
+
+        // Populate the author data before sending the response
+        // This makes the response more useful to the frontend
+        const populatedComment = await Comment.findById(savedComment._id)
+                                          .populate('author', 'fullName email') // Populate the User model fields
+                                          .lean(); // Convert to a plain JavaScript object
+
+        res.status(201).json(populatedComment);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server error');
     }
 });
 
