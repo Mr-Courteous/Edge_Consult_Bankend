@@ -38,90 +38,169 @@ router.get('/posts', async (req, res) => {
 
 
 
-// Route to get a single post by ID
-router.get('/posts/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const post = await Post.findById(id).populate('author', 'name');
-    if (!post) return res.status(404).send('<h1>Post not found</h1>');
-
-    const pageTitle = post.title;
-    const pageDescription = post.body?.substring(0, 150) || '';
-    const pageImage = post.image_path || '';
-    const pageUrl = `https://your-domain.com/posts/${post._id}`;
-
-    res.send(`
-      <!DOCTYPE html>
-      <html lang="en">
-        <head>
-          <meta charset="UTF-8"/>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-          <title>${pageTitle}</title>
-          <meta name="description" content="${pageDescription}"/>
-          <meta property="og:title" content="${pageTitle}"/>
-          <meta property="og:description" content="${pageDescription}"/>
-          <meta property="og:image" content="${pageImage}"/>
-          <meta property="og:url" content="${pageUrl}"/>
-          <meta name="twitter:card" content="summary_large_image"/>
-          <meta name="twitter:title" content="${pageTitle}"/>
-          <meta name="twitter:description" content="${pageDescription}"/>
-          <meta name="twitter:image" content="${pageImage}"/>
-        </head>
-        <body>
-          <div id="root"></div>
-          <script>
-            window.__POST_DATA__ = ${JSON.stringify(post)};
-          </script>
-          <script src="/bundle.js"></script>
-        </body>
-      </html>
-    `);
-  } catch (error) {
-    if (error.name === 'CastError') return res.status(400).send('<h1>Invalid Post ID</h1>');
-    console.error(error);
-    res.status(500).send('<h1>Server error</h1>');
-  }
-});
-
-// get all cooments numbers
+// Get Routes for all comments and their auther names
 
 
 
-// scholarships route to get posts with category 'scholarships'
-
-router.get('/scholarships', async (req, res) => {
+router.get('/posts/:postId/comments', async (req, res) => {
     try {
-        const scholarshipPosts = await Post.find({ category: 'scholarships' }).sort({ createdAt: -1 });
-        res.status(200).json(scholarshipPosts);
+        const { postId } = req.params;
+
+        // Find all comments where the 'post' field matches the postId
+        const comments = await Comment.find({ post: postId })
+            .populate('author', 'name') // Populate the author's name
+            .populate('replies'); // Populate any nested replies
+
+        if (!comments.length) {
+            return res.status(404).json({ message: 'No comments found for this post.' });
+        }
+
+        res.status(200).json(comments);
     } catch (error) {
-        console.error('Error fetching scholarship posts:', error);
-        res.status(500).json({ message: 'Server error occurred while fetching scholarship posts.' });
+        // Handle a potential CastError if the postId format is invalid
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid Post ID' });
+        }
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 });
 
 
 
 
-// router.get('/post/:postId', async (req, res) => {
-//     try {
-//         const postId = req.params.postId;
 
-//         // Find all comments for the given postId
-//         // Populate the 'author' field to get user details if available
-//         const comments = await Comment.find({ post: postId })
-//             .populate('author', 'fullName email') // Only populate if 'author' (ObjectId) exists
-//             .sort({ createdAt: -1 }) // Sort by newest comments first
-//             .lean(); // For performance, get plain JavaScript objects
 
-//         // The populate will only work if the 'author' field is actually an ObjectId referencing a User.
-//         // If it's an anonymous comment, the 'author' field will be null, and 'author_info' will contain the details.
 
-//         res.status(200).json(comments);
-//     } catch (err) {
-//         console.error(err.message);
-//         res.status(500).send('Server error');
-//     }
-// });
+
+// single Posts with metadata 
+
+router.get('/posts/:id', async (req, res) => {
+    try {
+        const postId = req.params.id;
+        const post = await Post.findById(postId).populate('author', 'name email');
+
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        // Generate meta tags
+        const meta = {
+            title: post.title,
+            description: post.body.substring(0, 160), // first 160 chars for description
+            image: post.image_path || '/default.jpg',
+            likes: post.likeCount,
+            author: post.author.name,
+            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
+        };
+
+        res.json({ post, meta });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
