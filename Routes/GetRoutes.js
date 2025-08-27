@@ -38,6 +38,22 @@ router.get('/posts', async (req, res) => {
 
 
 
+
+
+// For scholarshpip filter
+router.get('/scholarships', async (req, res) => {
+    try {
+        const scholarshipPosts = await Post.find({ category: 'scholarships' }).sort({ createdAt: -1 });
+        res.status(200).json(scholarshipPosts);
+    } catch (error) {
+        console.error('Error fetching scholarship posts:', error);
+        res.status(500).json({ message: 'Server error occurred while fetching scholarship posts.' });
+    }
+});
+
+
+
+
 // Get Routes for all comments and their auther names
 
 
