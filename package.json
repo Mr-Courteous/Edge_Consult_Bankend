@@ -9,7 +9,11 @@
   "author": "Courteous",
   "license": "ISC",
   "dependencies": {
+    "@babel/core": "^7.28.3",
+    "@babel/preset-env": "^7.28.3",
+    "@babel/preset-react": "^7.27.1",
     "@vercel/blob": "^1.1.1",
+    "babel-register": "^6.26.0",
     "bcryptjs": "^3.0.2",
     "body-parser": "^2.2.0",
     "cors": "^2.8.5",
@@ -20,6 +24,7 @@
     "mongoose": "^8.18.0",
     "multer": "^2.0.2",
     "nodemon": "^3.1.10",
+    "react": "^19.1.1",
     "react-dom": "^19.1.1"
   }
 }

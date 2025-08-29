@@ -7,6 +7,9 @@ const Comment = require('../Models/Comments'); // Import the Comment model
 
 
 
+
+
+
 /**
  * @route   GET /api/posts
  * @desc    Get all posts
@@ -56,8 +59,6 @@ router.get('/scholarships', async (req, res) => {
 
 // Get Routes for all comments and their auther names
 
-
-
 router.get('/posts/:postId/comments', async (req, res) => {
     try {
         const { postId } = req.params;
@@ -81,7 +82,7 @@ router.get('/posts/:postId/comments', async (req, res) => {
     }
 });
 
-
+   
 
 
 
@@ -90,7 +91,7 @@ router.get('/posts/:postId/comments', async (req, res) => {
 
 // // single Posts with metadata 
 
-// router.get('/:id', async (req, res) => {
+// router.get('/posts/:id', async (req, res) => {
 //     try {
 //         const postId = req.params.id;
 //         const post = await Post.findById(postId).populate('author', 'name email');
@@ -112,7 +113,6 @@ router.get('/posts/:postId/comments', async (req, res) => {
 //         }
 
 //         // Otherwise render SSR page
-//         res.render('post', { meta });
 
 //     } catch (error) {
 //         console.error(error);
@@ -121,59 +121,78 @@ router.get('/posts/:postId/comments', async (req, res) => {
 // });
 
 
+// GET a single post by ID
+router.get('/posts/:id', async (req, res) => {
+    try {
+        const post = await Post.findById(req.params.id)
+            .populate('author', 'username email') // Optional: Populates the author field with user data
+            .select('-__v'); // Optional: Excludes the __v field from the result
 
+        if (!post) {
+            return res.status(404).json({ message: 'Post not found' });
+        }
+
+        res.status(200).json(post);
+    } catch (error) {
+        // Check for CastError, which occurs if the ID format is invalid
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid post ID format' });
+        }
+        res.status(500).json({ message: error.message });
+    }
+});
 
 
 
 
 
 // SPA API route: used by React fetch
-router.get('/api/posts/:id', async (req, res) => {
-    try {
-        const post = await Post.findById(req.params.id).populate('author', 'name email');
-        if (!post) return res.status(404).json({ message: 'Post not found' });
+// router.get('/api/posts/:id', async (req, res) => {
+//     try {
+//         const post = await Post.findById(req.params.id).populate('author', 'name email');
+//         if (!post) return res.status(404).json({ message: 'Post not found' });
 
-        const meta = {
-            title: post.title,
-            description: post.body.substring(0, 160),
-            image: post.image_path || '/default.jpg',
-            likes: post.likeCount,
-            author: post.author?.name || 'Anonymous',
-            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
-        };
+//         const meta = {
+//             title: post.title,
+//             description: post.body.substring(0, 160),
+//             image: post.image_path || '/default.jpg',
+//             likes: post.likeCount,
+//             author: post.author?.name || 'Anonymous',
+//             url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
+//         };
 
-        res.json({ post, meta });
-    } catch (error) {
-        console.error('API fetch error:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+//         res.json({ post, meta });
+//     } catch (error) {
+//         console.error('API fetch error:', error);
+//         res.status(500).json({ message: 'Server error' });
+//     }
+// });
 
 // SSR route: renders HTML with meta for crawlers and initial React hydration
-router.get('/posts/:id', async (req, res) => {
-    try {
-        const post = await Post.findById(req.params.id).populate('author', 'name email');
-        if (!post) return res.status(404).send('Post not found');
+// router.get('/posts/:id', async (req, res) => {
+//     try {
+//         const post = await Post.findById(req.params.id).populate('author', 'name email');
+//         if (!post) return res.status(404).send('Post not found');
 
-        const meta = {
-            title: post.title,
-            description: post.body.substring(0, 160),
-            image: post.image_path || '/default.jpg',
-            likes: post.likeCount,
-            author: post.author?.name || 'Anonymous',
-            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
-        };
+//         const meta = {
+//             title: post.title,
+//             description: post.body.substring(0, 160),
+//             image: post.image_path || '/default.jpg',
+//             likes: post.likeCount,
+//             author: post.author?.name || 'Anonymous',
+//             url: `${req.protocol}://${req.get('host')}/posts/${post._id}`
+//         };
 
-        // Render the EJS template with meta and initialPost for React hydration
-        res.render('post', {
-            meta,
-            initialPost: post
-        });
-    } catch (error) {
-        console.error('SSR render error:', error);
-        res.status(500).send('Server error');
-    }
-});
+//         // Render the EJS template with meta and initialPost for React hydration
+//         res.render('post', {
+//             meta,
+//             initialPost: post
+//         });
+//     } catch (error) {
+//         console.error('SSR render error:', error);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 
 

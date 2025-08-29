@@ -1,5 +1,10 @@
 // Load environment variables
 require('dotenv').config();
+require('./babel-register'); // Enable Babel
+const React = require('react');
+const ReactDOMServer = require('react-dom/server');
+
+
 
 // Core Express and database connection
 const express = require('express');
@@ -18,6 +23,8 @@ const app = express();
 app.use(cors()); // Allow requests from all origins
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+app.use(express.static('dist'));
+
 
 // --- Database Connection ---
 connectDB();
