@@ -24,6 +24,9 @@ const PostContentRoutes = require ('./Routes/PostContentRoutes'); // Post conten
 const app = express();
 
 // --- Global Middleware ---
+
+
+
 app.use(cors()); // Allow requests from all origins
 app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
@@ -33,12 +36,6 @@ app.use(express.static('dist'));
 // --- Database Connection ---
 connectDB();
 
-// --- View Engine for SSR ---
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views')); // Place your EJS templates here
-
-// --- Serve Static Files from Vite Build ---
-app.use(express.static(path.join(__dirname, '../client/dist')));
 
 // --- API Routes ---
 app.use( PostRoutes); // Prefix API routes with /api/posts
@@ -50,29 +47,29 @@ app.use( PostContentRoutes); // Post content routes
 
 // --- SSR Route for Individual Posts ---
 // This assumes you have a posts EJS template at /server/views/post.ejs
-app.get('/posts/:id', async (req, res) => {
-    try {
-        const Post = require('./Models/Posts'); // Your Mongoose model
-        const postId = req.params.id;
-        const post = await Post.findById(postId).populate('author', 'name email');
+// app.get('/posts/:id', async (req, res) => {
+//     try {
+//         const Post = require('./Models/Posts'); // Your Mongoose model
+//         const postId = req.params.id;
+//         const post = await Post.findById(postId).populate('author', 'name email');
 
-        if (!post) return res.status(404).send('Post not found');
+//         if (!post) return res.status(404).send('Post not found');
 
-        const meta = {
-            title: post.title,
-            description: post.body.substring(0, 160),
-            image: post.image_path || '/default.jpg',
-            likes: post.likeCount,
-            author: post.author.name,
-            url: `${req.protocol}://${req.get('host')}/posts/${post._id}`,
-        };
+//         const meta = {
+//             title: post.title,
+//             description: post.body.substring(0, 160),
+//             image: post.image_path || '/default.jpg',
+//             likes: post.likeCount,
+//             author: post.author.name,
+//             url: `${req.protocol}://${req.get('host')}/posts/${post._id}`,
+//         };
 
-        res.render('post', { meta });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Server error');
-    }
-});
+//         res.render('post', { meta });
+//     } catch (err) {
+//         console.error(err);
+//         res.status(500).send('Server error');
+//     }
+// });
 
 // --- Root Route ---
 app.get('/', (req, res) => {
