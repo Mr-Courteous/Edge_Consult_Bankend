@@ -83,6 +83,59 @@ const PostSchema = new mongoose.Schema({
                 required: false
             }
         }
+    },
+    // New optional fields for job posts
+    jobDetails: {
+        required: false,
+        type: {
+            company: {
+                type: String,
+                required: false,
+                trim: true
+            },
+            location: {
+                type: String,
+                required: false,
+                trim: true
+            },
+            jobType: {
+                type: String,
+                required: false,
+                enum: ['Full-time', 'Part-time', 'Contract', 'Internship'],
+                trim: true
+            },
+            salary: {
+                min: { type: Number, required: false },
+                max: { type: Number, required: false }
+            },
+            salaryRange: {
+                type: String,
+                required: false,
+                trim: true
+            },
+            experienceRequired: {
+                type: String,
+                required: false,
+                trim: true
+            },
+            applicationDeadline: {
+                type: Date,
+                required: false
+            },
+            responsibilities: {
+                type: [String],
+                default: []
+            },
+            requirements: {
+                type: [String],
+                default: []
+            },
+            link: {
+                type: String,
+                required: false,
+                trim: true
+            }
+        }
     }
 }, {
     timestamps: true

@@ -35,34 +35,31 @@ const upload = multer({ storage: multer.memoryStorage() });
  * It supports general posts and specific scholarship-type posts with additional fields.
  */
 router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) => {
-    let blobUrl = null; // Initialize to null for potential cleanup
+    let blobUrl = null;
     try {
-        // Destructure core fields from req.body
         const { title, body, category, author } = req.body;
 
-        // Destructure scholarship-specific fields, if present
+        // Destructure scholarship-specific fields
         const { country, degree, description, funding, deadline, requirements } = req.body;
 
-        // Validate essential fields
+        // Destructure job-specific fields
+        const { company, location, jobType, salaryRange, experienceRequired, applicationDeadline, responsibilities, link } = req.body;
+
         if (!title || !body || !category || !author) {
             return res.status(400).json({ message: 'Missing required fields: title, body, or category.' });
         }
 
-        // Validate author ID format
         if (!mongoose.Types.ObjectId.isValid(author)) {
             return res.status(400).json({ message: 'Invalid author ID format.' });
         }
 
-        // Generate a URL-friendly slug from the post title
         const slug = generateSlug(title);
 
-        // Check for duplicate title or slug
         const existingPost = await Post.findOne({ $or: [{ slug: slug }, { title: title }] });
         if (existingPost) {
             return res.status(409).json({ message: 'A post with this title or slug already exists. Please use a different title.' });
         }
 
-        // Handle image upload to Vercel Blob Storage if a file is present
         if (req.file) {
             const fileExt = req.file.originalname.split('.').pop();
             const filename = `${slug}-${Date.now()}.${fileExt}`;
@@ -74,10 +71,8 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
             blobUrl = blob.url;
         }
 
-        // Parse tags from the request body
         const tags = req.body.tags ? JSON.parse(req.body.tags) : [];
 
-        // Prepare the post object to be saved
         const postData = {
             title,
             slug,
@@ -90,10 +85,7 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
 
         // If the category is 'scholarships', add the specific details
         if (category === 'scholarships') {
-            // Parse requirements if they are sent as a JSON string
             const parsedRequirements = requirements ? JSON.parse(requirements) : [];
-
-            // Add the scholarshipDetails object to the postData
             postData.scholarshipDetails = {
                 country,
                 degree,
@@ -104,18 +96,49 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
             };
         }
 
-        // Create and save the new post instance
+        // --- NEW: Handle job-specific fields ---
+        if (category === 'jobs') {
+            // Parse array fields if they are sent as JSON strings
+            const parsedRequirements = requirements ? JSON.parse(requirements) : [];
+            const parsedResponsibilities = responsibilities ? JSON.parse(responsibilities) : [];
+
+            // Parse salary range string into min and max numbers
+            let salary = {};
+            if (salaryRange) {
+                const parts = salaryRange.replace(/[$,k]/g, '').split('-').map(part => parseFloat(part.trim()));
+                if (parts.length === 2) {
+                    salary.min = parts[0] * 1000;
+                    salary.max = parts[1] * 1000;
+                } else if (parts.length === 1) {
+                    // Handle single number like '90k'
+                    salary.min = parts[0] * 1000;
+                    salary.max = parts[0] * 1000;
+                }
+            }
+
+            postData.jobDetails = {
+                company,
+                location,
+                jobType,
+                salary,
+                salaryRange, // Save the original string for display
+                experienceRequired,
+                applicationDeadline,
+                requirements: parsedRequirements,
+                responsibilities: parsedResponsibilities,
+                link
+            };
+        }
+        // --- END OF NEW CODE ---
+
         const newPost = new Post(postData);
         const savedPost = await newPost.save();
 
-        // Respond with success and the newly created post data
         res.status(201).json({ message: 'Blog post created successfully!', post: savedPost });
 
     } catch (error) {
-        // Log the full error for debugging purposes
         console.error('Error creating blog post:', error);
 
-        // --- Cleanup: Delete the uploaded blob if the database save or any other step fails ---
         if (blobUrl) {
             try {
                 await del(blobUrl, { token: process.env.BLOB_READ_WRITE_TOKEN });
@@ -125,16 +148,15 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
             }
         }
 
-        // Handle Mongoose validation errors
         if (error.name === 'ValidationError') {
             const messages = Object.values(error.errors).map(err => err.message);
             return res.status(400).json({ message: `Validation failed: ${messages.join(', ')}` });
         }
 
-        // Catch-all for other server errors
         res.status(500).json({ message: 'Server error occurred while creating the post. Please try again later.' });
     }
 });
+
 /**
  * @route   POST /register
  * @desc    Register a new user (admin role by default for first user)
