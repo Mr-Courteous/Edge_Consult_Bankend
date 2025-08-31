@@ -17,6 +17,7 @@ const PostRoutes = require('./Routes/PostsRoutes'); // API routes
 const GetRoutes = require('./Routes/GetRoutes');     // Other API routes
 const DeleteRoutes = require ('./Routes/DeleteRoutes'); // Delete routes
 const EmailRoutes = require ('./Routes/EmailRoutes'); // Email routes
+const PostContentRoutes = require ('./Routes/PostContentRoutes'); // Post content routes
 
 
 // Initialize Express app
@@ -44,6 +45,7 @@ app.use( PostRoutes); // Prefix API routes with /api/posts
 app.use( GetRoutes);        // Other API routes
 app.use( DeleteRoutes);     // Delete routes
 app.use( EmailRoutes);      // Email routes
+app.use( PostContentRoutes); // Post content routes
 
 
 // --- SSR Route for Individual Posts ---
