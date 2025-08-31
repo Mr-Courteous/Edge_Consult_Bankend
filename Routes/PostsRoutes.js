@@ -7,6 +7,8 @@ const bcrypt = require('bcryptjs'); // For password hashing (used in login/regis
 const Comment = require('../Models/Comments'); // Import the Comment model
 require('dotenv').config(); // Load environment variables
 const nodemailer = require('nodemailer'); // For sending emails
+const User = require('../Models/Users'); // Import the User model
+
 
 
 // ----------------------------------------

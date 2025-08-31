@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 // Replace 'your_mongodb_atlas_connection_string' with the actual connection string
 // const mongoURI = 'mongodb+srv://Courteous:mongokey@cluster0.qiuqa3p.mongodb.net/NewData?retryWrites=true&w=majorityyour_mongodb_atlas_connection_string';
-const connect = 'mongodb+srv://Courteous:mongokey@cluster0.qiuqa3p.mongodb.net/Edge_Consult_DB?retryWrites=true&w=majority';
+// const connect = 'mongodb+srv://Courteous:mongokey@cluster0.qiuqa3p.mongodb.net/Edge_Consult_DB?retryWrites=true&w=majority';
 
-
+const connect = "mongodb+srv://edgetopconsult_db_user:T474I75wIH4qU5Zh@cluster0.yyvztw4.mongodb.net/Edge_Consult_DB?retryWrites=true&w=majority"
 
 
 const connectDB = async () => {

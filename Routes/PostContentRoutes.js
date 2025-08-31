@@ -24,7 +24,7 @@ const { generateSlug } = require('../Utils/slugGenerator'); // Utility to genera
 // Use memory storage for Multer to handle file uploads in memory.
 // This is essential for serverless environments like Vercel as the filesystem is read-only.
 const upload = multer({ storage: multer.memoryStorage() });
-
+    
 
 
 /**
