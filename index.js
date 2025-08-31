@@ -16,6 +16,8 @@ const connectDB = require('./Dbconnection');
 const PostRoutes = require('./Routes/PostsRoutes'); // API routes
 const GetRoutes = require('./Routes/GetRoutes');     // Other API routes
 const DeleteRoutes = require ('./Routes/DeleteRoutes'); // Delete routes
+const EmailRoutes = require ('./Routes/EmailRoutes'); // Email routes
+
 
 // Initialize Express app
 const app = express();
@@ -41,6 +43,7 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 app.use( PostRoutes); // Prefix API routes with /api/posts
 app.use( GetRoutes);        // Other API routes
 app.use( DeleteRoutes);     // Delete routes
+app.use( EmailRoutes);      // Email routes
 
 
 // --- SSR Route for Individual Posts ---
