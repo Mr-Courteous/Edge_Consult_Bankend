@@ -15,6 +15,7 @@ const connectDB = require('./Dbconnection');
 // Import your routes
 const PostRoutes = require('./Routes/PostsRoutes'); // API routes
 const GetRoutes = require('./Routes/GetRoutes');     // Other API routes
+const DeleteRoutes = require ('./Routes/DeleteRoutes'); // Delete routes
 
 // Initialize Express app
 const app = express();
@@ -39,6 +40,8 @@ app.use(express.static(path.join(__dirname, '../client/dist')));
 // --- API Routes ---
 app.use( PostRoutes); // Prefix API routes with /api/posts
 app.use( GetRoutes);        // Other API routes
+app.use( DeleteRoutes);     // Delete routes
+
 
 // --- SSR Route for Individual Posts ---
 // This assumes you have a posts EJS template at /server/views/post.ejs
@@ -78,7 +81,7 @@ app.get('/api/greet', (req, res) => {
 });
 
 // --- Start Server ---
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
 });
