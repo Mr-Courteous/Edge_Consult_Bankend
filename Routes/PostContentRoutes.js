@@ -163,6 +163,85 @@ router.post('/add-posts', verifyToken, upload.single('image'), async (req, res) 
 // @route   POST api/comments/:postId
 // @desc    Add a comment to a post
 // @access  Private (requires authentication)
+router.post('/posts/:postId/comments', async (req, res) => {
+    try {
+        const { postId } = req.params;
+        const { content, author_info } = req.body;
+
+        // Validate required fields
+        if (!content || !content.trim()) {
+            return res.status(400).json({
+                error: 'Content is required and cannot be empty'
+            });
+        }
+
+        if (!postId) {
+            return res.status(400).json({
+                error: 'Post ID is required'
+            });
+        }
+
+        // Validate content length
+        if (content.trim().length > 500) {
+            return res.status(400).json({
+                error: 'Content cannot exceed 500 characters'
+            });
+        }
+
+        // Create comment object
+        const commentData = {
+            content: content.trim(),
+            post: postId
+        };
+
+        // Add author_info if provided
+        if (author_info && (author_info.fullName || author_info.email)) {
+            commentData.author_info = {};
+            if (author_info.fullName) {
+                commentData.author_info.fullName = author_info.fullName.trim();
+            }
+            if (author_info.email) {
+                commentData.author_info.email = author_info.email.toLowerCase().trim();
+            }
+        }
+
+        // Create and save the comment
+        const comment = new Comment(commentData);
+        await comment.save();
+
+        // Populate the comment before sending response
+        const populatedComment = await Comment.findById(comment._id)
+            .populate('post', 'title')
+            .populate('replies');
+
+        res.status(201).json(populatedComment);
+
+    } catch (error) {
+        console.error('Error creating comment:', error);
+        
+        // Handle validation errors
+        if (error.name === 'ValidationError') {
+            const errors = Object.values(error.errors).map(err => err.message);
+            return res.status(400).json({
+                error: 'Validation error',
+                details: errors
+            });
+        }
+
+        // Handle cast errors (invalid ObjectId)
+        if (error.name === 'CastError') {
+            return res.status(400).json({
+                error: 'Invalid post ID format'
+            });
+        }
+
+        res.status(500).json({
+            error: 'Failed to add comment'
+        });
+    }
+});
+
+
 
 router.post('/:postId', async (req, res) => {
     // Expecting either `authorId` or `author_info` (with fullName and email)
