@@ -34,7 +34,7 @@ router.post('/subscribe', async (req, res) => {
     // Define the email content
     const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: 'exradallenum@gmail.com', // The website owner's email details good
+        to: 'edgetopconsult@gmail.com', // The website owner's email details good
         subject: `New Newsletter Subscription`, // Changed subject to be more specific
         html: `
             <h3>New Subscriber!</h3>
@@ -77,7 +77,7 @@ router.post('/send-message-exradallenum', async (req, res) => {
     // Define the email content
     const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: 'inumiduncourteous@gmail.com', // The website owner's email
+        to: 'exradallenum@gmail.com', // The website owner's email
         subject: `New Message from Contact Form: ${fullName}`,
         html: `
             <h3>New Contact Form Submission</h3>
